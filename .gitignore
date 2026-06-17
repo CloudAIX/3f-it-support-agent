@@ -3,3 +3,8 @@ __pycache__/
 .env
 *.pyc
 multiagent/memory_store.json
+.DS_Store
+*.zip
+LangGraph diagram.png
+Multi-Agent-IT-Support-System-LangGraph/
+Untitled.*
