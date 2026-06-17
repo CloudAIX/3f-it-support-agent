@@ -4,10 +4,11 @@ Each function is one node in the graph. It receives the full SupportState,
 does exactly one job, and returns a dict of only the fields it updates.
 LangGraph merges those partial updates back into the shared state.
 
-Two agents call the LLM (Nebius/Llama): tone_agent and review_agent.
-Three agents call tools only (no LLM): intake_agent, knowledge_agent,
-action_agent. Model calls are kept minimal — use the LLM only where
-judgement over unstructured text is needed.
+Three agents call the LLM (Nebius/Llama): intake_agent (greeting),
+tone_agent (emotion), and review_agent (post-call review).
+Two agents call tools only (no LLM): knowledge_agent, action_agent.
+Model calls are kept minimal — use the LLM only where judgement over
+unstructured text is needed.
 """
 
 import json
@@ -18,7 +19,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 from langgraph.types import interrupt
 
-from memory import load_history, save_call
+from memory import get_pending_context, load_history, save_call
 from state import SupportState
 from tools import create_ticket, escalate, lookup_employee, search_kb
 
@@ -28,6 +29,20 @@ llm = ChatOpenAI(
     base_url="https://api.tokenfactory.nebius.com/v1/",
     api_key=os.getenv("NEBIUS_API_KEY"),
     model="meta-llama/Llama-3.3-70B-Instruct",
+)
+
+_GREETING_SYSTEM = (
+    "You write a short, warm, spoken-style greeting for an IT support agent "
+    "answering an inbound call. The caller's identity is already known — the IVR "
+    "passed their employee ID and we've looked them up. "
+    "Rules: address the caller by first name only; 1-2 sentences maximum; "
+    "natural spoken language, no corporate jargon; never ask for their name or ID. "
+    "If there are pending context items (open tickets, recent notifications), "
+    "reference the single most relevant one to pre-empt why they may be calling. "
+    "Example with context: 'Hi Priya — I can see we raised a ticket about your VPN "
+    "yesterday, is that what you're calling about?' "
+    "Example without context: 'Hi Tom, great to have you — what can I help you with today?' "
+    "Reply with ONLY the greeting text, nothing else."
 )
 
 _TONE_SYSTEM = (
@@ -59,18 +74,26 @@ _HIGH_URGENCY_TONES = {"frustrated", "upset", "urgent"}
 
 
 # ---------------------------------------------------------------------------
-# Agent 1 — tool only, no LLM (calls lookup_employee + loads long-term memory)
+# Agent 1 — tool + LLM (lookup_employee, load memory, generate greeting)
 # ---------------------------------------------------------------------------
 
 def intake_agent(state: SupportState) -> dict:
-    """Verify the caller's identity and load their call history.
+    """Verify the caller, load long-term memory, and compose a proactive greeting.
 
-    Calls lookup_employee with the employee_id in state. On success writes
-    employee_name, department, and verified=True. Also loads past call history
-    from memory.py for the warm-start: a returning caller's previous issues
-    and outcomes are placed in past_history so the rest of the graph can see
-    them.
+    Three things happen in sequence:
+
+    1. Tool call — lookup_employee: verifies identity, writes name/department/verified.
+
+    2. Memory load — loads call history and pending context (open tickets,
+       notifications) from memory.py for this employee.
+
+    3. LLM call — uses Nebius/Llama to compose a 1-2 sentence spoken greeting.
+       If pending context exists, the greeting pre-empts the likely reason for
+       calling ("I see we raised a ticket about your VPN yesterday — is that
+       what you're calling about?"). If no context, it gives a warm friendly
+       opening. Fails safe to a generic greeting on any LLM error.
     """
+    # --- Step 1: verify identity -------------------------------------------
     result = lookup_employee.invoke({"employee_id": state["employee_id"]})
 
     if result["found"] and result["verified"]:
@@ -80,7 +103,13 @@ def intake_agent(state: SupportState) -> dict:
     else:
         note = f"intake: no employee record matched '{state['employee_id']}'"
 
+    name = result.get("name") or "there"
+    first_name = name.split()[0] if name and name != "there" else name
+
+    # --- Step 2: load long-term memory -------------------------------------
     history = load_history(state["employee_id"])
+    pending = get_pending_context(state["employee_id"])
+
     if history:
         last = history[-1]
         note_mem = (
@@ -90,13 +119,46 @@ def intake_agent(state: SupportState) -> dict:
     else:
         note_mem = "intake: first-time caller — no prior history"
 
+    note_pending = (
+        f"intake: {len(pending)} pending context item(s) loaded"
+        if pending else "intake: no pending context"
+    )
+
+    # --- Step 3: compose proactive greeting via LLM ------------------------
+    # Build the user message: name + pending context + abbreviated history.
+    pending_text = (
+        json.dumps(pending, indent=2) if pending else "None"
+    )
+    last_call_text = (
+        f"issue='{history[-1]['issue']}', outcome='{history[-1]['outcome']}'"
+        if history else "None"
+    )
+    user_msg = (
+        f"Caller first name: {first_name}\n"
+        f"Pending context items: {pending_text}\n"
+        f"Last call on record: {last_call_text}"
+    )
+
+    try:
+        response = llm.invoke([
+            SystemMessage(content=_GREETING_SYSTEM),
+            HumanMessage(content=user_msg),
+        ])
+        greeting = (response.content or "").strip().strip('"')
+    except Exception:
+        greeting = f"Hi {first_name}, thanks for calling — what can I help you with today?"
+
+    note_greeting = f"intake: greeting generated ({'with pending context' if pending else 'no pending context'})"
+
     return {
-        "employee_name": result.get("name"),
-        "department":    result.get("department"),
-        "verified":      bool(result["found"] and result["verified"]),
-        "past_history":  history,
-        "attempts":      [note, note_mem],
-        "step_count":    state["step_count"] + 1,
+        "employee_name":  result.get("name"),
+        "department":     result.get("department"),
+        "verified":       bool(result["found"] and result["verified"]),
+        "past_history":   history,
+        "pending_context": pending,
+        "greeting":       greeting,
+        "attempts":       [note, note_mem, note_pending, note_greeting],
+        "step_count":     state["step_count"] + 1,
     }
 
 

@@ -96,6 +96,13 @@ def _print_final(label: str, final: dict) -> None:
     print(f"{'─' * 62}")
     print(f"  Employee       : {final.get('employee_name')} ({final.get('department')})")
     print(f"  Verified       : {final.get('verified')}")
+    greeting = final.get("greeting", "")
+    if greeting:
+        print(f"\n  *** GREETING ***")
+        print(f"  \"{greeting}\"")
+        print()
+    pending = final.get("pending_context") or []
+    print(f"  Pending items  : {len(pending)} loaded")
     tone = final.get("emotional_tone", "—")
     print(f"  Detected tone  : {tone}")
     empathy = final.get("empathy_note", "")
@@ -115,85 +122,100 @@ def _print_final(label: str, final: dict) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Demo: Run A (calm caller) vs Run B (upset caller, different path)
+# Demo: proactive greeting (E1001 with pending context vs E1002 without)
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
+    from memory import set_pending_context
+
     store_path = Path(__file__).parent / "memory_store.json"
     if store_path.exists():
         store_path.unlink()
         print("(cleared memory_store.json for a clean demo)\n")
 
+    # Pre-seed E1001's pending context — simulates what the ticketing system
+    # and IVR platform would have written before the call was answered.
+    set_pending_context("E1001", [
+        {
+            "type":      "open_ticket",
+            "ticket_id": "TKT1001",
+            "issue":     "VPN not working after password change",
+            "raised":    "yesterday",
+            "status":    "open",
+        },
+        {
+            "type":    "notification",
+            "message": "VPN maintenance window completed at 08:00 this morning",
+            "sent":    "this morning",
+        },
+    ])
+    print("(pre-seeded E1001 pending context: open VPN ticket + maintenance notification)\n")
+
     _BLANK: SupportState = {
-        "issue_text":     "",
-        "employee_id":    "",
-        "employee_name":  None,
-        "department":     None,
-        "verified":       False,
-        "emotional_tone": "",
-        "empathy_note":   "",
-        "kb_found":       False,
-        "kb_steps":       [],
-        "ticket_id":      None,
-        "escalation_id":  None,
-        "attempts":       [],
-        "confidence":     1.0,
-        "step_count":     0,
-        "past_history":   [],
-        "review":         None,
+        "issue_text":      "",
+        "employee_id":     "",
+        "employee_name":   None,
+        "department":      None,
+        "verified":        False,
+        "emotional_tone":  "",
+        "empathy_note":    "",
+        "kb_found":        False,
+        "kb_steps":        [],
+        "ticket_id":       None,
+        "escalation_id":   None,
+        "attempts":        [],
+        "confidence":      1.0,
+        "step_count":      0,
+        "past_history":    [],
+        "pending_context": [],
+        "greeting":        "",
+        "review":          None,
     }
 
     # -----------------------------------------------------------------------
-    # RUN A — calm caller, routine VPN issue.
-    # Expected: tone="calm", KB match → resolved via steps, no escalation.
+    # RUN A — E1001, has pending context (open VPN ticket + notification).
+    # Expected greeting: references TKT1001 / VPN ticket proactively.
     # -----------------------------------------------------------------------
     print("=" * 62)
-    print("  RUN A — Calm caller, routine issue")
+    print("  RUN A — E1001 (pending context: open VPN ticket)")
     print("=" * 62)
-    issue_a = "I can't connect to the VPN today. Can you help?"
-    print(f"  Issue : \"{issue_a}\"")
+    issue_a = "Yes, calling about my VPN — still not working after the maintenance"
+    print(f"  Caller says: \"{issue_a}\"")
+    print("  (greeting is generated BEFORE caller states their issue)\n")
 
-    config_a = {"configurable": {"thread_id": "run-a"}}
+    config_a = {"configurable": {"thread_id": "greet-a"}}
     final_a = graph.invoke(
         {**_BLANK, "employee_id": "E1001", "issue_text": issue_a},
         config=config_a,
     )
-    _print_final("RUN A result — calm path", final_a)
+    _print_final("RUN A — proactive greeting with pending context", final_a)
 
     # -----------------------------------------------------------------------
-    # RUN B — upset caller, unrecognised issue (no KB match).
-    # Expected: tone="frustrated"/"upset"/"urgent", no KB match →
-    # action_agent fast-tracks straight to escalation WITHOUT pausing for
-    # a ticket-approval interrupt. Empathy note is set for the agent.
+    # RUN B — E1002, no pending context, first-time caller.
+    # Expected greeting: warm generic opening, no pre-emption.
     # -----------------------------------------------------------------------
     print("\n\n" + "=" * 62)
-    print("  RUN B — Upset caller, unrecognised issue")
+    print("  RUN B — E1002 (no pending context, first-time caller)")
     print("=" * 62)
-    issue_b = (
-        "This is the THIRD time I've called!! My entire computer is dead — "
-        "screen, keyboard, everything — and I have a board presentation in "
-        "30 minutes. Nobody has helped me and I am absolutely FURIOUS. "
-        "Fix this NOW."
-    )
-    print(f"  Issue : \"{issue_b}\"")
+    issue_b = "I can't print anything — the printer just shows an error"
+    print(f"  Caller says: \"{issue_b}\"")
+    print("  (greeting is generated BEFORE caller states their issue)\n")
 
-    config_b = {"configurable": {"thread_id": "run-b"}}
+    config_b = {"configurable": {"thread_id": "greet-b"}}
     final_b = graph.invoke(
         {**_BLANK, "employee_id": "E1002", "issue_text": issue_b},
         config=config_b,
     )
-    _print_final("RUN B result — fast-track escalation path", final_b)
+    _print_final("RUN B — generic greeting, no pending context", final_b)
 
-    # Summary: show side-by-side what changed
+    # Side-by-side comparison
     print("\n\n" + "=" * 62)
-    print("  ROUTING COMPARISON")
+    print("  GREETING COMPARISON")
     print("=" * 62)
-    print(f"  {'':30s}  {'RUN A':>12}  {'RUN B':>12}")
-    print(f"  {'─'*30}  {'─'*12}  {'─'*12}")
-    print(f"  {'Detected tone':<30}  {final_a.get('emotional_tone','—'):>12}  {final_b.get('emotional_tone','—'):>12}")
-    print(f"  {'KB match':<30}  {str(final_a.get('kb_found')):>12}  {str(final_b.get('kb_found')):>12}")
-    print(f"  {'Ticket raised':<30}  {str(bool(final_a.get('ticket_id'))):>12}  {str(bool(final_b.get('ticket_id'))):>12}")
-    print(f"  {'Escalated':<30}  {str(bool(final_a.get('escalation_id'))):>12}  {str(bool(final_b.get('escalation_id'))):>12}")
-    print(f"  {'HITL interrupt triggered':<30}  {'No':>12}  {'No (bypassed)':>12}")
-    print(f"  {'Empathy note set':<30}  {str(bool(final_a.get('empathy_note'))):>12}  {str(bool(final_b.get('empathy_note'))):>12}")
+    print(f"  RUN A greeting  : \"{final_a.get('greeting', '')}\"")
+    print(f"  RUN B greeting  : \"{final_b.get('greeting', '')}\"")
+    print(f"\n  Pending items   : {len(final_a.get('pending_context') or [])} (A) vs "
+          f"{len(final_b.get('pending_context') or [])} (B)")
+    print(f"  Prior history   : {len(final_a.get('past_history') or [])} (A) vs "
+          f"{len(final_b.get('past_history') or [])} (B)")
     print()
