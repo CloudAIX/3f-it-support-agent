@@ -61,27 +61,14 @@ issue is resolved or correctly escalated in under five minutes.
 
 ## Architecture
 
+![3F IT Support Voice Agent Architecture](./architecture.png)
+
 The voice and conversation layer is **ElevenLabs Conversational AI** (speech-to-text, the
 agent loop, text-to-speech, turn-taking). It holds the system prompt and the routing
 instructions, and it decides which tool to call.
 
 The tools sit behind a **Python backend (FastAPI)**. Each tool is one HTTP endpoint that
 ElevenLabs calls. The backend is the part in this repository.
-
-```
-Caller (voice)
-      │
-      ▼
-ElevenLabs Conversational AI   ← the agent: listens, reasons, decides which tool to call
-      │  (calls tools over HTTP)
-      ▼
-FastAPI backend (this repo)
-      ├── /lookup_employee   read    — verify the caller
-      ├── /search_kb         read    — find a fix in the knowledge base
-      ├── /create_ticket     write   — raise a support ticket (needs caller's OK first)
-      ├── /escalate          write   — hand off to a human (the catch-all)
-      └── /post_call_review  model   — Nebius/Llama reviews the call transcript
-```
 
 ### The agent pattern: a single agent using the routing pattern
 
