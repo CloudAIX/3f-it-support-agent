@@ -88,6 +88,25 @@ agents use a large (70-billion-parameter) model. This is the latency trade-off i
 A production voice agent would use a smaller, faster model for the conversational turns —
 this is the planned next iteration and connects to the evaluation work in Week 5.
 
+### Production note: human-in-the-loop over voice
+
+Building the voice layer surfaced a real design seam. The LangGraph backend uses a blocking
+`interrupt()` that pauses and waits for human approval before a write — correct for text,
+but a problem over voice, because voice tool calls use webhooks that time out if you make
+them wait.
+
+The production answer (confirmed with the ElevenLabs team in a guest session) is
+**asynchronous tools**: the agent fires the tool call and keeps the caller engaged in
+conversation rather than blocking, and the backend response later unlocks new tools or adds
+knowledge to the agent mid-conversation. The next iteration of the voice layer would use
+this async pattern instead of a blocking pause.
+
+Two related notes from the same session:
+- **Caller identity** can be resolved in the short gap before a call connects, using a
+  pre-call webhook — which is what the proactive greeting needs in a real deployment.
+- **Audio-level emotion detection** (tone from the waveform) is not yet production-ready on
+  the platform, so the text-based emotion detection used here is the right current approach.
+
 ---
 
 ## The tools
