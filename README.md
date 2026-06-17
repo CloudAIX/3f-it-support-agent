@@ -32,20 +32,7 @@ instructions, and it decides which tool to call.
 The tools sit behind a **Python backend (FastAPI)**. Each tool is one HTTP endpoint that
 ElevenLabs calls. The backend is the part in this repository.
 
-```
-Caller (voice)
-      │
-      ▼
-ElevenLabs Conversational AI   ← the agent: listens, reasons, decides which tool to call
-      │  (calls tools over HTTP)
-      ▼
-FastAPI backend (this repo)
-      ├── /lookup_employee   read    — verify the caller
-      ├── /search_kb         read    — find a fix in the knowledge base
-      ├── /create_ticket     write   — raise a support ticket (needs caller's OK first)
-      ├── /escalate          write   — hand off to a human (the catch-all)
-      └── /post_call_review  model   — Nebius/Llama reviews the call transcript
-```
+![Architecture diagram](architecture.png)
 
 ### The agent pattern: a single agent using the routing pattern
 
@@ -180,6 +167,7 @@ crashing the app.
 |---|---|
 | `main.py` | The FastAPI backend — all five endpoints. |
 | `requirements.txt` | The Python packages needed to run it. |
+| `architecture.png` | Architecture diagram showing the agent, backend tools, and HITL layer. |
 | `.gitignore` | Keeps the virtual environment and the secret `.env` file out of the repo. |
 | `README.md` | This file. |
 
