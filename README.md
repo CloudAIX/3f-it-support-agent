@@ -1,3 +1,39 @@
+# 3F — IT Support Agent (Week 3, Mastering Agentic AI)
+
+A multi-agent IT support system that takes an employee IT support request from start to
+finish: greet and verify the caller, find a fix, raise a ticket or escalate to a human,
+and review the call afterwards. Built for Week 3 of the Mastering Agentic AI course
+(The Gen Academy). All data is fake; there are no real company details.
+
+## This repository has two versions
+
+This project was built in two stages. Both are here.
+
+### → Version 2: Multi-Agent System (the Week 3 submission)
+**Folder: [`multiagent/`](./multiagent) — start here.**
+
+A true multi-agent system built with **LangGraph**: four specialist agents (Intake,
+Knowledge, Action, Review) coordinated by an orchestrator, with a real human-in-the-loop
+approval gate, long-term memory (warm-start), emotion-driven routing, and a proactive
+greeting. A voice front-end (ElevenLabs) calls the same backend tools.
+
+**Read the full details in the [`multiagent/` README](./multiagent).**
+
+### Version 1: Single Voice Agent (the first build)
+**Folder: repository root (the files below).**
+
+A single agent using the routing pattern — the ElevenLabs voice loop calling four tools
+behind a FastAPI backend. This was the first build and is documented below. It shows the
+single-agent approach; Version 2 shows the multi-agent approach. Building both demonstrates
+the judgement of when each pattern is appropriate.
+
+---
+
+*Everything below this line documents Version 1 (the single voice agent). For the
+multi-agent system, see the [`multiagent/`](./multiagent) folder.*
+
+---
+
 # 3F — IT Support Voice Agent (ITSM)
 
 A voice-based AI support agent that takes an employee IT support call from start to
@@ -32,7 +68,20 @@ instructions, and it decides which tool to call.
 The tools sit behind a **Python backend (FastAPI)**. Each tool is one HTTP endpoint that
 ElevenLabs calls. The backend is the part in this repository.
 
-![Architecture diagram](architecture.png)
+```
+Caller (voice)
+      │
+      ▼
+ElevenLabs Conversational AI   ← the agent: listens, reasons, decides which tool to call
+      │  (calls tools over HTTP)
+      ▼
+FastAPI backend (this repo)
+      ├── /lookup_employee   read    — verify the caller
+      ├── /search_kb         read    — find a fix in the knowledge base
+      ├── /create_ticket     write   — raise a support ticket (needs caller's OK first)
+      ├── /escalate          write   — hand off to a human (the catch-all)
+      └── /post_call_review  model   — Nebius/Llama reviews the call transcript
+```
 
 ### The agent pattern: a single agent using the routing pattern
 
@@ -167,7 +216,6 @@ crashing the app.
 |---|---|
 | `main.py` | The FastAPI backend — all five endpoints. |
 | `requirements.txt` | The Python packages needed to run it. |
-| `architecture.png` | Architecture diagram showing the agent, backend tools, and HITL layer. |
 | `.gitignore` | Keeps the virtual environment and the secret `.env` file out of the repo. |
 | `README.md` | This file. |
 
