@@ -1,0 +1,48 @@
+"""Working memory for the multi-agent IT support system.
+
+This module defines SupportState — the single shared object that every agent
+in the graph reads from and writes to during one support conversation. It acts
+as both working memory (what is happening right now) and short-term memory
+(what has been tried, what was found). No agent holds private state; everything
+lives here so any node can hand off cleanly to any other node.
+
+LangGraph passes this dict through every node and merges node outputs back into
+it. Fields with an Annotated[list, operator.add] reducer are safe for multiple
+nodes to extend without overwriting each other — used for `attempts`, which
+every agent appends to.
+"""
+
+import operator
+from typing import Annotated, TypedDict
+
+
+class SupportState(TypedDict):
+    # --- Input ---------------------------------------------------------------
+    issue_text: str          # The caller's raw issue description, set once at entry
+
+    # --- Intake agent --------------------------------------------------------
+    employee_id: str         # Caller-supplied ID, e.g. "E1001"
+    employee_name: str | None        # Resolved from the employee record; None if not found
+    department: str | None           # Caller's department; None if lookup failed
+    verified: bool           # True only when the employee record confirms identity
+
+    # --- Knowledge agent -----------------------------------------------------
+    kb_found: bool           # True if a KB article matched the issue
+    kb_steps: list[str]      # Ordered resolution steps from the matched article; [] if none
+
+    # --- Action agent --------------------------------------------------------
+    ticket_id: str | None    # Set when a support ticket is created; None otherwise
+    escalation_id: str | None        # Set when the call is handed to a human; None otherwise
+
+    # --- Shared running log --------------------------------------------------
+    attempts: Annotated[list[str], operator.add]  # Append-only log of what every agent tried;
+                                                   # operator.add reducer lets nodes extend safely
+
+    # --- Routing -------------------------------------------------------------
+    confidence: float        # 0.0–1.0 score; low values route toward escalation
+
+    # --- Loop guard ----------------------------------------------------------
+    step_count: int          # Incremented by each node; graph halts if it exceeds the cap
+
+    # --- Review agent --------------------------------------------------------
+    review: dict | None      # Structured post-call review: {resolved, correct_path, followup}
