@@ -19,9 +19,10 @@ from langchain_core.tools import tool
 # ---------------------------------------------------------------------------
 
 _EMPLOYEES = {
-    "E1001": {"name": "Priya Nair",      "department": "Finance",      "verified": True},
-    "E1002": {"name": "Tom Becker",      "department": "Engineering",  "verified": True},
-    "E1003": {"name": "Sara Lindqvist",  "department": "Sales",        "verified": False},
+    "E1001": {"name": "Priya Nair",      "department": "Finance",        "verified": True},
+    "E1002": {"name": "Tom Becker",      "department": "Engineering",    "verified": True},
+    "E1003": {"name": "Sara Lindqvist",  "department": "Sales",          "verified": False},
+    "A10":   {"name": "Nathan",          "department": "Innovation Lab", "verified": True},
 }
 
 _KB = [

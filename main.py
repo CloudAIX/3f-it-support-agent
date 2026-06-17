@@ -61,9 +61,10 @@ app = FastAPI(
 # Fake data only. Swapping this dict for a real DB changes nothing in the
 # agent machinery — the tool contract (args in, shape out) stays identical.
 _EMPLOYEE_RECORDS = {
-    "E1001": {"name": "Priya Nair", "department": "Finance", "verified": True},
-    "E1002": {"name": "Tom Becker", "department": "Engineering", "verified": True},
-    "E1003": {"name": "Sara Lindqvist", "department": "Sales", "verified": False},
+    "E1001": {"name": "Priya Nair",      "department": "Finance",        "verified": True},
+    "E1002": {"name": "Tom Becker",      "department": "Engineering",    "verified": True},
+    "E1003": {"name": "Sara Lindqvist",  "department": "Sales",          "verified": False},
+    "A10":   {"name": "Nathan",          "department": "Innovation Lab", "verified": True},
 }
 
 
