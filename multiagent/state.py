@@ -26,6 +26,10 @@ class SupportState(TypedDict):
     department: str | None           # Caller's department; None if lookup failed
     verified: bool           # True only when the employee record confirms identity
 
+    # --- Tone agent ----------------------------------------------------------
+    emotional_tone: str      # "calm" | "frustrated" | "upset" | "urgent" — set by tone_agent
+    empathy_note: str        # Short acknowledgement line for the agent; "" when tone is calm
+
     # --- Knowledge agent -----------------------------------------------------
     kb_found: bool           # True if a KB article matched the issue
     kb_steps: list[str]      # Ordered resolution steps from the matched article; [] if none
@@ -43,6 +47,9 @@ class SupportState(TypedDict):
 
     # --- Loop guard ----------------------------------------------------------
     step_count: int          # Incremented by each node; graph halts if it exceeds the cap
+
+    # --- Long-term memory (loaded by intake_agent, read-only thereafter) ----
+    past_history: list[dict]  # Past call summaries from memory.py; [] for first-time callers
 
     # --- Review agent --------------------------------------------------------
     review: dict | None      # Structured post-call review: {resolved, correct_path, followup}

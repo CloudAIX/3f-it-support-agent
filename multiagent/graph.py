@@ -1,45 +1,52 @@
 """LangGraph graph for the multi-agent IT support system.
 
-Wires intake → knowledge/action → action → review into a compiled graph.
-One conditional branch (post-intake) routes based on caller verification.
-A max-steps guardrail prevents runaway loops if the graph ever gets stuck.
+Full pipeline with tone-aware routing:
 
-Flow (happy path):
-  START → intake → knowledge → action → review → END
+  Flow (happy path, calm caller):
+    START → intake → tone → knowledge → action → review → END
 
-Flow (unverified caller):
-  START → intake → action (escalates) → review → END
+  Flow (unverified caller):
+    START → intake → tone → action (escalates) → review → END
+
+  Flow (upset/frustrated/urgent caller, no KB match):
+    START → intake → tone → knowledge → action (fast-track escalate) → review → END
+
+  Flow (calm caller, no KB match):
+    START → intake → tone → knowledge → action (HITL interrupt) → review → END
 """
 
 import json
+from pathlib import Path
 
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import Command
 
-from agents import action_agent, intake_agent, knowledge_agent, review_agent
+from agents import (
+    action_agent,
+    intake_agent,
+    knowledge_agent,
+    review_agent,
+    tone_agent,
+)
 from state import SupportState
 
-# Runaway-loop guardrail. Each agent increments step_count by 1, so with
-# four agents the normal maximum is 4. Setting the cap at 8 gives ample
-# headroom for future nodes while still catching any accidental cycle.
-MAX_STEPS = 8
+MAX_STEPS = 10  # raised from 8 to accommodate the extra tone node
 
 
 # ---------------------------------------------------------------------------
-# Router — the only conditional branch in the graph
+# Router — runs after tone_agent; reads verified + step_count
 # ---------------------------------------------------------------------------
 
-def route_after_intake(state: SupportState) -> str:
-    """Decide what runs after intake_agent.
+def route_after_tone(state: SupportState) -> str:
+    """Decide what runs after tone_agent.
 
     Normal routing:
       verified=True  → knowledge (search KB, then action, then review)
       verified=False → action   (escalate immediately, then review)
 
-    Guardrail: if step_count has already reached MAX_STEPS, skip straight to
-    review regardless of verification status. This is the runaway-loop cap —
-    it ensures a misconfigured or looping graph cannot spin indefinitely.
+    Guardrail: if step_count has reached MAX_STEPS, skip straight to review.
+    This cap prevents runaway loops regardless of graph state.
     """
     if state["step_count"] >= MAX_STEPS:  # runaway-loop guardrail
         return "review"
@@ -52,24 +59,23 @@ def route_after_intake(state: SupportState) -> str:
 
 builder = StateGraph(SupportState)
 
-# Nodes — one per agent function
 builder.add_node("intake",    intake_agent)
+builder.add_node("tone",      tone_agent)      # NEW — classifies emotional tone
 builder.add_node("knowledge", knowledge_agent)
 builder.add_node("action",    action_agent)
 builder.add_node("review",    review_agent)
 
 # Fixed edges
 builder.add_edge(START,       "intake")
+builder.add_edge("intake",    "tone")          # tone always runs after intake
 builder.add_edge("knowledge", "action")
 builder.add_edge("action",    "review")
 builder.add_edge("review",    END)
 
-# Conditional edge: intake → (knowledge | action | review)
-# path_map makes the routing explicit — each string the router returns maps
-# to a named node, so renaming a node won't silently break the branch.
+# Conditional edge: tone → (knowledge | action | review)
 builder.add_conditional_edges(
-    "intake",
-    route_after_intake,
+    "tone",
+    route_after_tone,
     {
         "knowledge": "knowledge",
         "action":    "action",
@@ -77,20 +83,24 @@ builder.add_conditional_edges(
     },
 )
 
-# MemorySaver is required for interrupt/resume — it checkpoints state between
-# the first invoke (which pauses at interrupt) and the second (which resumes).
 graph = builder.compile(checkpointer=MemorySaver())
 
 
 # ---------------------------------------------------------------------------
-# Helper for printing a final state block
+# Print helper
 # ---------------------------------------------------------------------------
 
 def _print_final(label: str, final: dict) -> None:
-    print(f"\n{'─' * 55}")
+    print(f"\n{'─' * 62}")
     print(f"  {label}")
-    print(f"{'─' * 55}")
-    print(f"  Verified       : {final.get('verified')}  ({final.get('employee_name')}, {final.get('department')})")
+    print(f"{'─' * 62}")
+    print(f"  Employee       : {final.get('employee_name')} ({final.get('department')})")
+    print(f"  Verified       : {final.get('verified')}")
+    tone = final.get("emotional_tone", "—")
+    print(f"  Detected tone  : {tone}")
+    empathy = final.get("empathy_note", "")
+    if empathy:
+        print(f"  Empathy note   : \"{empathy}\"")
     print(f"  KB found       : {final.get('kb_found')}")
     print(f"  Ticket ID      : {final.get('ticket_id') or '(none)'}")
     print(f"  Escalation ID  : {final.get('escalation_id') or '(none)'}")
@@ -98,86 +108,92 @@ def _print_final(label: str, final: dict) -> None:
     print(f"\n  Attempts log:")
     for i, entry in enumerate(final.get("attempts") or [], 1):
         print(f"    {i}. {entry}")
-    print(f"\n  Post-call review:")
     review = final.get("review")
     if review:
+        print(f"\n  Post-call review:")
         print(f"    " + json.dumps(review, indent=4).replace("\n", "\n    "))
-    else:
-        print("    (none)")
 
 
 # ---------------------------------------------------------------------------
-# Two-run demo: happy path + HITL interrupt/resume
+# Demo: Run A (calm caller) vs Run B (upset caller, different path)
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
+    store_path = Path(__file__).parent / "memory_store.json"
+    if store_path.exists():
+        store_path.unlink()
+        print("(cleared memory_store.json for a clean demo)\n")
 
     _BLANK: SupportState = {
-        "issue_text":    "",
-        "employee_id":   "",
-        "employee_name": None,
-        "department":    None,
-        "verified":      False,
-        "kb_found":      False,
-        "kb_steps":      [],
-        "ticket_id":     None,
-        "escalation_id": None,
-        "attempts":      [],
-        "confidence":    1.0,
-        "step_count":    0,
-        "review":        None,
+        "issue_text":     "",
+        "employee_id":    "",
+        "employee_name":  None,
+        "department":     None,
+        "verified":       False,
+        "emotional_tone": "",
+        "empathy_note":   "",
+        "kb_found":       False,
+        "kb_steps":       [],
+        "ticket_id":      None,
+        "escalation_id":  None,
+        "attempts":       [],
+        "confidence":     1.0,
+        "step_count":     0,
+        "past_history":   [],
+        "review":         None,
     }
 
     # -----------------------------------------------------------------------
-    # RUN 1 — happy path: VPN issue, KB match, no interrupt
+    # RUN A — calm caller, routine VPN issue.
+    # Expected: tone="calm", KB match → resolved via steps, no escalation.
     # -----------------------------------------------------------------------
-    print("\n" + "=" * 55)
-    print("  RUN 1 — Happy path (KB match, no HITL gate)")
-    print("=" * 55)
-    print("  Employee : E1001   Issue : I can't connect to the VPN")
+    print("=" * 62)
+    print("  RUN A — Calm caller, routine issue")
+    print("=" * 62)
+    issue_a = "I can't connect to the VPN today. Can you help?"
+    print(f"  Issue : \"{issue_a}\"")
 
-    config_1 = {"configurable": {"thread_id": "run-1"}}
-    final_1 = graph.invoke(
-        {**_BLANK, "employee_id": "E1001", "issue_text": "I can't connect to the VPN"},
-        config=config_1,
+    config_a = {"configurable": {"thread_id": "run-a"}}
+    final_a = graph.invoke(
+        {**_BLANK, "employee_id": "E1001", "issue_text": issue_a},
+        config=config_a,
     )
-    _print_final("RUN 1 — completed without interrupt", final_1)
+    _print_final("RUN A result — calm path", final_a)
 
     # -----------------------------------------------------------------------
-    # RUN 2 — HITL path: unknown issue, no KB match, interrupt fires
+    # RUN B — upset caller, unrecognised issue (no KB match).
+    # Expected: tone="frustrated"/"upset"/"urgent", no KB match →
+    # action_agent fast-tracks straight to escalation WITHOUT pausing for
+    # a ticket-approval interrupt. Empathy note is set for the agent.
     # -----------------------------------------------------------------------
-    print("\n\n" + "=" * 55)
-    print("  RUN 2 — HITL path (no KB match, interrupt triggered)")
-    print("=" * 55)
-    print("  Employee : E1002   Issue : my chair is broken")
-
-    config_2 = {"configurable": {"thread_id": "run-2"}}
-
-    # First invoke — runs intake + knowledge, then hits interrupt() in action.
-    # graph.invoke() returns the accumulated state at the pause point.
-    state_at_pause = graph.invoke(
-        {**_BLANK, "employee_id": "E1002", "issue_text": "my chair is broken"},
-        config=config_2,
+    print("\n\n" + "=" * 62)
+    print("  RUN B — Upset caller, unrecognised issue")
+    print("=" * 62)
+    issue_b = (
+        "This is the THIRD time I've called!! My entire computer is dead — "
+        "screen, keyboard, everything — and I have a board presentation in "
+        "30 minutes. Nobody has helped me and I am absolutely FURIOUS. "
+        "Fix this NOW."
     )
+    print(f"  Issue : \"{issue_b}\"")
 
-    # Read the interrupt message from the checkpointer snapshot.
-    snapshot = graph.get_state(config_2)
-    intr_value = None
-    for task in snapshot.tasks:
-        for intr in task.interrupts:
-            intr_value = intr.value
+    config_b = {"configurable": {"thread_id": "run-b"}}
+    final_b = graph.invoke(
+        {**_BLANK, "employee_id": "E1002", "issue_text": issue_b},
+        config=config_b,
+    )
+    _print_final("RUN B result — fast-track escalation path", final_b)
 
-    print(f"\n  ┌─ GRAPH PAUSED ──────────────────────────────────")
-    print(f"  │  Interrupt : {intr_value}")
-    print(f"  │  Pending   : {snapshot.next}")
-    print(f"  │  State so far — verified: {state_at_pause.get('verified')}, "
-          f"kb_found: {state_at_pause.get('kb_found')}, "
-          f"step_count: {state_at_pause.get('step_count')}")
-    print(f"  └─────────────────────────────────────────────────")
-
-    # Human approves the ticket proposal.
-    print(f"\n  [HUMAN DECISION → 'yes' (approve ticket)]")
-    final_2 = graph.invoke(Command(resume="yes"), config=config_2)
-    _print_final("RUN 2 — completed after human approval", final_2)
-
+    # Summary: show side-by-side what changed
+    print("\n\n" + "=" * 62)
+    print("  ROUTING COMPARISON")
+    print("=" * 62)
+    print(f"  {'':30s}  {'RUN A':>12}  {'RUN B':>12}")
+    print(f"  {'─'*30}  {'─'*12}  {'─'*12}")
+    print(f"  {'Detected tone':<30}  {final_a.get('emotional_tone','—'):>12}  {final_b.get('emotional_tone','—'):>12}")
+    print(f"  {'KB match':<30}  {str(final_a.get('kb_found')):>12}  {str(final_b.get('kb_found')):>12}")
+    print(f"  {'Ticket raised':<30}  {str(bool(final_a.get('ticket_id'))):>12}  {str(bool(final_b.get('ticket_id'))):>12}")
+    print(f"  {'Escalated':<30}  {str(bool(final_a.get('escalation_id'))):>12}  {str(bool(final_b.get('escalation_id'))):>12}")
+    print(f"  {'HITL interrupt triggered':<30}  {'No':>12}  {'No (bypassed)':>12}")
+    print(f"  {'Empathy note set':<30}  {str(bool(final_a.get('empathy_note'))):>12}  {str(bool(final_b.get('empathy_note'))):>12}")
     print()
