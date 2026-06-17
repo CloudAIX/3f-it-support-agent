@@ -32,22 +32,7 @@ pattern: the right agent for each step, with the orchestrator coordinating.
 
 ## Architecture
 
-```
-                         ORCHESTRATOR (router)
-                  reads shared state, decides next agent
-                                  │
-        ┌──────────────┬──────────┴──────┬───────────────┐
-        ▼              ▼                  ▼               ▼
-     INTAKE        KNOWLEDGE           ACTION          REVIEW
-   verify +        find fix         ticket /         judge the
-   greet +         (KB search)      escalate         call
-   detect tone                      (HITL gate)      (Nebius)
-        │              │                  │               │
-        └──────────────┴──────────────────┴───────────────┘
-                    shared state (working memory)
-                              │
-                  long-term memory (file store, by employee ID)
-```
+![Multi-Agent IT Support System Architecture](./architecture.png)
 
 ---
 
