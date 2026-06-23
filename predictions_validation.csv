@@ -1,0 +1,6 @@
+id,predicted_tool,predicted_requires_approval,latency_ms,total_tokens,route_path,raw
+11,search_kb,False,3263.8,0,llm,The caller is describing an IT problem.
+15,search_kb,False,1893.6,0,llm,Caller is describing an IT problem.
+20,escalate,True,11425.1,0,llm,"The caller is asking for a senior person to look at their issue, which indicates they need further assistance that requires escalation."
+22,unsupported,False,127.9,0,fast,Matched out-of-scope keyword rule.
+28,chitchat,False,126.8,0,fast,Prompt-injection pattern detected; refusing.

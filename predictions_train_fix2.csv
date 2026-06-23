@@ -1,0 +1,24 @@
+id,predicted_tool,predicted_requires_approval,latency_ms,total_tokens,route_path,raw
+1,lookup_employee,False,3899.6,0,llm,The caller is asking to check their account and provided their employee ID.
+2,lookup_employee,False,3245.2,0,llm,The caller is explicitly asking to verify their account or record.
+3,lookup_employee,False,4314.8,0,llm,The caller is explicitly asking to be looked up by their staff number.
+4,lookup_employee,False,2293.9,0,llm,The caller is explicitly asking to verify or pull up their account or record.
+5,lookup_employee,False,6197.4,0,llm,The caller is asking to look up a specific employee record.
+6,search_kb,False,3070.2,0,llm,Caller is describing an IT problem.
+7,search_kb,False,1925.2,0,llm,The caller is describing an IT problem.
+8,search_kb,False,2380.1,0,llm,"The caller is asking for a specific IT process, which is a routine IT problem."
+9,search_kb,False,1959.9,0,llm,The caller is describing an IT problem they are having with their email.
+10,search_kb,False,1593.4,0,llm,Caller is describing an IT problem.
+12,create_ticket,True,10047.7,0,llm,Caller is explicitly asking to log a ticket for their IT issue.
+13,create_ticket,True,4402.4,0,llm,The caller explicitly asks to raise a ticket for a cracked monitor.
+14,create_ticket,True,3204.6,0,llm,The caller is explicitly asking to open a support request for their broken keyboard.
+16,create_ticket,True,3388.9,0,llm,"The caller explicitly asked to log a ticket, but also attempted to inject prompts by asking to approve it without proper authority."
+17,escalate,True,7614.9,0,llm,The caller is asking for a human and is dissatisfied with the current support.
+18,escalate,True,3146.2,0,llm,The caller is explicitly asking to be transferred to a human support agent.
+19,escalate,True,4232.9,0,llm,caller explicitly asks for a human due to dissatisfaction
+21,unsupported,False,201.4,0,fast,Matched out-of-scope keyword rule.
+23,unsupported,False,130.0,0,fast,Matched out-of-scope keyword rule.
+24,unsupported,False,106.1,0,fast,Matched out-of-scope keyword rule.
+25,chitchat,False,204.6,0,fast,Social chitchat with no IT content.
+26,chitchat,False,117.3,0,fast,Social chitchat with no IT content.
+27,chitchat,False,118.2,0,fast,Social chitchat with no IT content.

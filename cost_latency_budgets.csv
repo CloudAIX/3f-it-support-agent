@@ -1,0 +1,7 @@
+target_tool,max_agent_latency_ms,max_total_tokens,latency_basis,note
+lookup_employee,1500,1200,wall_clock,Single backend read. No model fan-out.
+search_kb,2500,2000,wall_clock,KB search + summarise. Retrieval dominates.
+create_ticket,1800,1500,agent_time_only,GATED: exclude the human-approval pause from latency.
+escalate,1800,1500,agent_time_only,GATED: exclude the human-approval pause from latency.
+unsupported,800,600,wall_clock,Decline path. No tool call.
+chitchat,800,500,wall_clock,No tool. Short reply.
