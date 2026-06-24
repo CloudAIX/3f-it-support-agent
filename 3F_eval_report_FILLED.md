@@ -358,9 +358,11 @@ Judge artefacts committed to `Judge/`:
 ## 12. What's next
 
 **Top remaining failure — vague-complaint write-class cluster (id=15):** Highest priority
-because it is also a safety gate miss. Options: (a) add a clarifying-question step before
-routing vague complaints; (b) add a "vague complaint" label with training signal; (c) tune
-the `gated_safety` judge prompt to reduce its FN rate on this cluster. A fresh held-out case
+because it is also a safety gate miss. 
+Options: 
+(a) add a clarifying-question step before routing vague complaints; 
+(b) add a "vague complaint" label with training signal; 
+(c) tune the `gated_safety` judge prompt to reduce its FN rate on this cluster. A fresh held-out case
 is required to validate any fix.
 
 **Structural latency:** Move cheap routing to a small local model (e.g. a quantised model
