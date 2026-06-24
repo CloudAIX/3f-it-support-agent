@@ -74,7 +74,7 @@ def upload_dataset(csv_path: str) -> str:
         outputs=[
             {
                 "target_tool": r["target_tool"],
-                "hotl_required": r.get("hotl_required", "false").lower() == "true",
+                "hotl_required": r.get("hotl_required", "false").lower() in ("true", "yes"),
             }
             for r in rows
         ],

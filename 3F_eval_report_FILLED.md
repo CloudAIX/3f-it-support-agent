@@ -182,7 +182,7 @@ code change needed, as LangGraph emits traces automatically.
 Command: `python run_baseline.py golden_dataset_v1.csv predictions_train_baseline.csv --split train`
 Scored: `python score.py golden_dataset_v1.csv cost_latency_budgets.csv predictions_train_baseline.csv --split train`
 
-LangSmith experiment: [baseline-7362e382](https://smith.langchain.com/o/96a917a7-5221-4004-869c-38839883e442/datasets/bc531937-e735-4967-b110-df500e7bee9d/compare?selectedSessions=372fc8f2-b340-4f61-873a-279913aa4eca)
+LangSmith experiment: [baseline-9205358d](https://smith.langchain.com/o/96a917a7-5221-4004-869c-38839883e442/datasets/6707ee9b-24a4-46af-83a3-19cfa5ed45dc/compare?selectedSessions=171837b5-d6b6-425f-9989-f08b0c0e4b26)
 
 | Metric | Baseline result |
 | --- | --- |
@@ -305,7 +305,7 @@ Run once against 5 held-out rows after both fixes. Never tuned against.
 Command: `python run_baseline.py golden_dataset_v1.csv predictions_validation.csv --split validation`
 Scored: `python score.py golden_dataset_v1.csv cost_latency_budgets.csv predictions_validation.csv --split validation`
 
-LangSmith experiment: [validation-79ae4f25](https://smith.langchain.com/o/96a917a7-5221-4004-869c-38839883e442/datasets/bc531937-e735-4967-b110-df500e7bee9d/compare?selectedSessions=44bfb46e-0815-444d-b5ea-334fad164596)
+LangSmith experiment: [validation-74d132f5](https://smith.langchain.com/o/96a917a7-5221-4004-869c-38839883e442/datasets/6707ee9b-24a4-46af-83a3-19cfa5ed45dc/compare?selectedSessions=c61ac7ce-4eb4-4d15-831b-d2c1a042c0ed)
 
 | Metric | Train (final) | Validation | Gap |
 | --- | --- | --- | --- |
@@ -385,10 +385,10 @@ Judge artefacts committed to `Judge/`:
 ## 12. What's next
 
 **Top remaining failure — vague-complaint write-class cluster (id=15):** Highest priority
-because it is also a safety gate miss. 
-Options: 
-(a) add a clarifying-question step before routing vague complaints; 
-(b) add a "vague complaint" label with training signal; 
+because it is also a safety gate miss.
+Options:
+(a) add a clarifying-question step before routing vague complaints;
+(b) add a "vague complaint" label with training signal;
 (c) tune the `gated_safety` judge prompt to reduce its FN rate on this cluster. A fresh held-out case
 is required to validate any fix.
 
@@ -398,12 +398,10 @@ genuinely ambiguous utterances. The pre-classifier handles ~6 / 23 unambiguous r
 remaining 17 need reasoning and cannot be keyword-classified. This is the structural fix the
 pre-classifier only partially addresses.
 
-**Token cost axis:** Return model token usage from `/route` so the token-budget column
-actually measures. Until then, token compliance is reported as untested.
-
-**LangSmith integration:** Wrap `/route` in a LangChain runnable, set
-`LANGCHAIN_TRACING_V2=true` — two env vars from working once the wrapper exists. Would give
-run-level traces, token cost, and the Comparison view for baseline vs. post-improvement diffs.
+**Token cost axis:** `_route_llm_call()` returns `prompt_tokens` / `completion_tokens` and
+LangSmith captures them via `@traceable`. The remaining gap is `score.py`: the HTTP `/route`
+response body does not expose usage, so `run_baseline.py` cannot populate the token-cost
+column. Adding a `usage` field to `RouteDecision` would close this.
 
 **Production monitoring (thresholds logged, not yet built):**
 
