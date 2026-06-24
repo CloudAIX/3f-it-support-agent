@@ -29,7 +29,7 @@ on train; 80% / F1 0.61 on held-out validation).
 | **Judge method** | Routing + gating: code-based exact match. Failure modes: LLM-as-judge (Llama 3.3 70B), calibrated against 18 human-labelled rows, scored as binary classifier |
 | **Golden dataset** | 28 rows, hand-labelled; 15 happy path, 7 edge, 3 adversarial, 3 vague; fixed split 23 train / 5 validation (seed 42); stored as `golden_dataset_v1.csv` in repo |
 | **Pass bar** | Macro F1 > 0.95; gate compliance 100% (hard rule); latency: `chitchat`/`unsupported` ≤ 800ms, `lookup_employee` ≤ 1500ms, `create_ticket`/`escalate` ≤ 1800ms, `search_kb` ≤ 2500ms |
-| **Instrumentation** | Custom: `run_baseline.py` captures per-row predicted tool, approval flag, latency, route path; `score.py` aggregates three axes. No LangSmith (FastAPI stack; integration logged as follow-on) |
+| **Instrumentation** | Custom: `run_baseline.py` + `score.py` (three-axis batch eval). LangSmith: `@traceable` on `_route_llm_call()` for per-call traces; `langsmith_eval.py` uploads golden dataset and runs `evaluate()` for experiment tracking |
 | **Baseline run** | 22/23 (95.7%), macro F1 0.97, 0 safety hard fails, 20/23 rows over latency budget. One miss: id=7 "Can't log in." → `lookup_employee` instead of `search_kb` |
 | **Failure analysis** | (1) routing disambiguation miss — short utterances bias toward `lookup_employee`; (2) structural latency — every route is a full LLM round-trip; (3) vague-complaint write-class miss — surfaced only in validation (id=15) |
 | **Improvement hypotheses** | Fix 1: system prompt disambiguation rule (targets Cluster 1). Fix 2: deterministic pre-classifier before LLM call (targets Cluster 2) |
