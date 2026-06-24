@@ -1,9 +1,10 @@
-# 3F — IT Support Agent (Week 3, Mastering Agentic AI)
+# 3F — IT Support Agent (Weeks 3 & 4, Mastering Agentic AI)
 
-A multi-agent IT support system that takes an employee IT support request from start to
+A multi-agent IT support system that takes an employee IT support call from start to
 finish: greet and verify the caller, find a fix, raise a ticket or escalate to a human,
-and review the call afterwards. Built for Week 3 of the Mastering Agentic AI course
-(The Gen Academy). All data is fake; there are no real company details.
+and review the call afterwards. Built across Weeks 3 and 4 of the Mastering Agentic AI
+course (The Gen Academy). Week 4 adds a structured evaluation layer with LangSmith
+experiment tracking. All data is fake; there are no real company details.
 
 ## This repository has two versions
 
@@ -15,17 +16,18 @@ This project was built in two stages. Both are here.
 A true multi-agent system built with **LangGraph**: four specialist agents (Intake,
 Knowledge, Action, Review) coordinated by an orchestrator, with a real human-in-the-loop
 approval gate, long-term memory (warm-start), emotion-driven routing, and a proactive
-greeting. A voice front-end (ElevenLabs) calls the same backend tools.
+greeting. A voice front-end (ElevenLabs) calls the same backend tools. Gains LangSmith
+tracing automatically when `LANGCHAIN_TRACING_V2=true` is set.
 
 **Read the full details in the [`multiagent/` README](./multiagent).**
 
-### Version 1: Single Voice Agent (the first build)
+### Version 1: Single Voice Agent + Week 4 Eval (the first build)
 **Folder: repository root (the files below).**
 
 A single agent using the routing pattern — the ElevenLabs voice loop calling four tools
-behind a FastAPI backend. This was the first build and is documented below. It shows the
-single-agent approach; Version 2 shows the multi-agent approach. Building both demonstrates
-the judgement of when each pattern is appropriate.
+behind a FastAPI backend. This was the first build and is documented below. It also hosts
+the **Week 4 evaluation layer**: a golden dataset, three-axis scoring, and LangSmith
+experiment tracking via `langsmith_eval.py`.
 
 ---
 
@@ -74,6 +76,48 @@ ElevenLabs calls. The backend is the part in this repository.
 
 This build uses **one agent** (the ElevenLabs loop) that **routes** to the right tool for
 each step. It is not a multi-agent network. This was a deliberate choice, explained below.
+
+---
+
+## Week 4 — Evaluation
+
+The `/route` endpoint (added in Week 4) exposes the routing decision as a standalone
+HTTP endpoint so it can be hit by an external eval harness without an ElevenLabs voice
+session. It uses a deterministic keyword pre-classifier for speed-sensitive classes
+(`chitchat`, `unsupported`) and falls back to a Nebius / Llama 3.3 70B function-calling
+call for everything else.
+
+### Three-axis evaluation
+
+| Axis | Metric | Pass bar |
+|---|---|---|
+| Quality | Macro F1 across six tools | > 0.95 |
+| Safety | Gate compliance (write-class must set `requires_approval`) | 100% — hard rule |
+| Cost + Speed | Rows within per-tool latency budget | tracked, not a pass/fail gate |
+
+### LangSmith integration
+
+`main.py` wraps the Nebius call in a `@traceable` function (`_route_llm_call`) so every
+routing decision appears as a trace in LangSmith when `LANGCHAIN_TRACING_V2=true` is set.
+
+`langsmith_eval.py` uploads the golden dataset to LangSmith once, then runs `evaluate()`
+against the live `/route` endpoint:
+
+```bash
+export LANGSMITH_API_KEY=lsv2_...
+export LANGCHAIN_TRACING_V2=true
+export LANGCHAIN_PROJECT=3f-routing-eval
+export ROUTE_URL=http://127.0.0.1:8000/route
+
+python langsmith_eval.py golden_dataset_v1.csv --upload-only          # first time
+python langsmith_eval.py golden_dataset_v1.csv --split train --experiment-prefix baseline
+python langsmith_eval.py golden_dataset_v1.csv --split validation --experiment-prefix validation
+```
+
+Baseline result (train, 23 rows): **23/23 routing accuracy, 0 safety hard fails.**
+Validation result (5 held-out rows): **4/5 routing accuracy, 0 safety hard fails.**
+
+Full evaluation write-up: [`3F_eval_report_FILLED.md`](./3F_eval_report_FILLED.md)
 
 ---
 
@@ -180,9 +224,14 @@ source .venv/bin/activate
 # 2. Install dependencies
 pip install -r requirements.txt
 
-# 3. Create a .env file with your key (this file is NOT committed)
+# 3. Create a .env file with your keys (this file is NOT committed)
 #    NEBIUS_API_KEY=your-key-here
 #    NEBIUS_MODEL=meta-llama/Llama-3.3-70B-Instruct
+#
+#    # Optional — enables LangSmith tracing and eval
+#    LANGSMITH_API_KEY=lsv2_...
+#    LANGCHAIN_TRACING_V2=true
+#    LANGCHAIN_PROJECT=3f-routing-eval
 
 # 4. Start the server (the --reload-exclude keeps it from watching .venv)
 uvicorn main:app --reload --reload-exclude '.venv'
@@ -201,9 +250,20 @@ crashing the app.
 
 | File | What it is |
 |---|---|
-| `main.py` | The FastAPI backend — all five endpoints. |
-| `requirements.txt` | The Python packages needed to run it. |
-| `.gitignore` | Keeps the virtual environment and the secret `.env` file out of the repo. |
+| `main.py` | FastAPI backend — five tool endpoints plus the `/route` eval endpoint. `_route_llm_call()` is decorated with `@traceable` for LangSmith. |
+| `requirements.txt` | Python packages (FastAPI, uvicorn, openai, langsmith, python-dotenv, pydantic, requests). |
+| `golden_dataset_v1.csv` | 28 hand-labelled routing cases (23 train / 5 validation, seed 42). |
+| `run_baseline.py` | Batch eval runner — posts each row to `/route`, saves predictions CSV. |
+| `score.py` | Three-axis scorer — quality (F1), safety (gate compliance), cost+speed (latency). |
+| `langsmith_eval.py` | LangSmith-native eval runner — uploads dataset, runs `evaluate()`, prints experiment link. |
+| `predictions_train_baseline.csv` | Raw predictions from the baseline run (pre-fix). |
+| `predictions_train_fix1.csv` | Predictions after disambiguation prompt fix. |
+| `predictions_train_fix2.csv` | Predictions after keyword pre-classifier fix. |
+| `predictions_validation.csv` | Predictions from the held-out validation split. |
+| `cost_latency_budgets.csv` | Per-tool latency budgets used by `score.py`. |
+| `3F_eval_report_FILLED.md` | Full Week 4 evaluation report. |
+| `multiagent/` | Week 3 multi-agent LangGraph system (separate README inside). |
+| `.gitignore` | Keeps `.venv` and `.env` out of the repo. |
 | `README.md` | This file. |
 
 ---
@@ -212,11 +272,13 @@ crashing the app.
 
 - **FastAPI** — the web framework for the tool endpoints
 - **ElevenLabs Conversational AI** — the voice and conversation layer
-- **Nebius Token Factory (Llama 3.3 70B)** — the model behind the post-call review
+- **Nebius Token Factory (Llama 3.3 70B)** — model behind post-call review and routing
+- **LangSmith** — experiment tracking and per-call traces (`@traceable` + `evaluate()`)
+- **LangGraph** — multi-agent orchestration in `multiagent/` (Week 3)
 - **Claude Code** — used to build the backend (vibe-coding: directing the AI in plain
   language and reviewing the output)
 
 ---
 
-*Part of the Mastering Agentic AI course (The Gen Academy), Week 3. Built in the open.
+*Part of the Mastering Agentic AI course (The Gen Academy), Weeks 3 & 4. Built in the open.
 All data is fake; no real company details are included.*
