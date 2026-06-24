@@ -13,10 +13,16 @@ pieces, logged so they can be picked up slowly without getting lost.
    cost+latency budgets) with --split flag. STATUS: working, smoke-tested.
 4. Held-out validation split (5 rows, seed 42, stratified). STATUS: in dataset.
 
+## Built (eval cycle 2 — LangSmith + fixes)
+5. `langsmith_eval.py` — LangSmith-native runner; uploads golden dataset,
+   runs `evaluate()` against `/route`, records named experiments. STATUS: live.
+6. `@traceable` on `_route_llm_call()` in `main.py` — per-call LangSmith
+   traces when `LANGCHAIN_TRACING_V2=true`. STATUS: live.
+7. **Token-usage passthrough in /route** — `usage` field added to
+   `RouteDecision`; `_route_llm_call()` returns `prompt_tokens` /
+   `completion_tokens`; `run_baseline.py` reads and records them. STATUS: done.
+
 ## To pick up later (logged, not tonight)
-- **Token-usage passthrough in /route** — return Nebius `usage` so the
-  `total_tokens` budget axis actually measures. Currently blank/untested.
-  Small change. Until done, do NOT report token compliance as passing.
 - **Latency redesign — local-models angle (Evals/finetuning bridge)** — if the
   keyword pre-classifier (Block B) doesn't move median latency enough, the
   fuller fix is a small LOCAL intent model (Ollama / a LoRA-tuned classifier)

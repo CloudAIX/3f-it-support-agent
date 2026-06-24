@@ -42,6 +42,8 @@ Requirements:
        args: dict                # the arguments the agent would pass to that tool
        reasoning: str            # one short sentence, for the trace
        raw_model_output: str | None = None
+       route_path: str = "llm"   # added in Block B: "fast" (pre-classifier) or "llm" (Nebius)
+       usage: dict | None = None  # added later: {"prompt_tokens": int, "completion_tokens": int}
    ```
 
 2. The endpoint sends the utterance to Nebius with the four tools described as

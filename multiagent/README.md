@@ -86,7 +86,8 @@ human with a handoff identifier and a summary of what was tried.
 One honest finding from testing: the voice responses are noticeably slow because all
 agents use a large (70-billion-parameter) model. This is the latency trade-off in action.
 A production voice agent would use a smaller, faster model for the conversational turns —
-this is the planned next iteration and connects to the evaluation work in Week 5.
+this is the planned next iteration. The routing latency has been measured and analysed in
+the Week 4 evaluation (see [`3F_eval_report_FILLED.md`](../3F_eval_report_FILLED.md)).
 
 ### Production note: human-in-the-loop over voice
 
@@ -183,10 +184,16 @@ memory.
 ## Where this goes next
 
 - **Faster model for voice:** a smaller model for the conversational turns, to cut latency
-  (the light/strong model split).
-- **Observability and evaluation (→ Week 5):** tracing, a golden test set, model-as-judge.
-- **Local or fine-tuned models (→ Week 4):** where a local model could replace a cloud call.
-- **Security and production hardening (→ Week 6):** prompt-injection defence, authentication,
+  (the light/strong model split). Measured in the Week 4 eval: structural latency is the
+  second-largest failure cluster; a small local intent model would be the real fix.
+- **Observability and evaluation (done — Week 4):** golden dataset (28 rows), three-axis
+  code scorer (`score.py`), LLM-as-judge calibration, LangSmith experiment tracking. See
+  [`3F_eval_report_FILLED.md`](../3F_eval_report_FILLED.md) and
+  [`langsmith_eval.py`](../langsmith_eval.py). The multiagent system gains LangSmith
+  tracing automatically by setting `LANGCHAIN_TRACING_V2=true`.
+- **Local or fine-tuned models:** where a local model could replace a cloud call for cheap
+  routing decisions (reduces latency and cost for unambiguous utterances).
+- **Security and production hardening:** prompt-injection defence, authentication,
   audit trail, data-privacy controls, and gated handling of any high-risk actions.
 
 ---
