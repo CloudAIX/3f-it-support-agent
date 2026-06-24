@@ -26,7 +26,10 @@ Three axes, three sections (Ash's quality/cost/speed triangle):
   C. Cost+speed — per-row budget breaches + a fleet summary.
 
 predictions.csv columns expected (run_baseline.py writes these):
-  id, predicted_tool, predicted_requires_approval, latency_ms, total_tokens, raw
+  id, predicted_tool, predicted_requires_approval, latency_ms, total_tokens, route_path, raw
+
+  route_path: "llm" | "fast" | "error". Older prediction files may omit this column;
+  score.py handles the missing column gracefully via .get().
 """
 
 import argparse

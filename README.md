@@ -114,8 +114,9 @@ python langsmith_eval.py golden_dataset_v1.csv --split train --experiment-prefix
 python langsmith_eval.py golden_dataset_v1.csv --split validation --experiment-prefix validation
 ```
 
-Baseline result (train, 23 rows): **23/23 routing accuracy, 0 safety hard fails.**
-Validation result (5 held-out rows): **4/5 routing accuracy, 0 safety hard fails.**
+Unfixed baseline (train, 23 rows): **22/23 routing accuracy (95.7%), 0 safety hard fails.**
+Post-improvement (train, after both fixes): **23/23 routing accuracy (100%), 0 safety hard fails.**
+Validation / held-out (5 rows, run once after fixes): **4/5 routing accuracy (80%), 1 safety hard fail (id=15 — vague complaint, unfixed by design).**
 
 Full evaluation write-up: [`3F_eval_report_FILLED.md`](./3F_eval_report_FILLED.md)
 

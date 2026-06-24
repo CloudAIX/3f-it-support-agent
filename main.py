@@ -546,6 +546,7 @@ class RouteDecision(BaseModel):
     reasoning: str            # one short sentence, for the trace
     raw_model_output: str | None = None
     route_path: str = "llm"   # "fast" (pre-classifier) or "llm" (Nebius)
+    usage: dict | None = None  # {"prompt_tokens": int, "completion_tokens": int}; None on fast path
 
 
 # --- Pre-classifier keyword lists ----------------------------------------
@@ -923,6 +924,7 @@ def route(request: RouteRequest) -> RouteDecision:
             reasoning=reasoning,
             raw_model_output=result["raw"],
             route_path="llm",
+            usage=result.get("usage"),
         )
     except Exception as err:
         logger.info("route FAILED — %s", err)

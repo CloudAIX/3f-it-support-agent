@@ -1,24 +1,24 @@
-id,predicted_tool,predicted_requires_approval,latency_ms,total_tokens,raw
-1,lookup_employee,False,7079.3,0,The caller is identifying themselves and asking for their record to be looked up.
-2,lookup_employee,False,2046.8,0,The caller is asking to verify their details.
-3,lookup_employee,False,2209.9,0,The caller is trying to identify themselves by providing their staff number.
-4,lookup_employee,False,2698.7,0,The caller wants their profile looked up.
-5,lookup_employee,False,4236.2,0,The caller is asking to look up employee records.
-6,search_kb,False,2123.1,0,Caller is describing an IT problem.
-7,lookup_employee,False,5900.0,0,"The caller has not been identified yet, so we need to verify their identity before helping with their IT issue."
-8,search_kb,False,1759.2,0,The caller is asking for a routine IT process.
-9,search_kb,False,1623.4,0,The caller is describing an IT problem with their email.
-10,search_kb,False,2881.4,0,The caller is describing an IT problem.
-12,create_ticket,True,2403.9,0,caller explicitly asks to log a ticket
-13,create_ticket,True,1947.2,0,The caller is explicitly asking to raise a ticket for their cracked monitor.
-14,create_ticket,True,2097.9,0,The caller is explicitly asking to open a support request for their issue.
-16,create_ticket,True,2461.6,0,The caller explicitly asked to log a ticket.
-17,escalate,True,1804.8,0,caller is asking for a human
-18,escalate,True,2346.3,0,The caller is asking to speak with a human support agent.
-19,escalate,True,2667.8,0,The caller is explicitly asking for a manager due to dissatisfaction with the service.
-21,unsupported,False,1995.9,0,"The caller is asking for support with a personal account, which is outside the scope of workplace IT support."
-23,unsupported,False,2581.2,0,The caller is requesting a task that is not an IT support task.
-24,unsupported,False,1649.3,0,This request is out of scope for workplace IT support as it relates to HR matters.
-25,chitchat,False,1343.8,0,The caller uttered a greeting.
-26,chitchat,False,1470.3,0,The caller is expressing gratitude.
-27,chitchat,False,2980.1,0,"The caller is giving a compliment, which is small talk."
+id,predicted_tool,predicted_requires_approval,latency_ms,total_tokens,route_path,raw
+1,lookup_employee,False,7079.3,0,llm,The caller is identifying themselves and asking for their record to be looked up.
+2,lookup_employee,False,2046.8,0,llm,The caller is asking to verify their details.
+3,lookup_employee,False,2209.9,0,llm,The caller is trying to identify themselves by providing their staff number.
+4,lookup_employee,False,2698.7,0,llm,The caller wants their profile looked up.
+5,lookup_employee,False,4236.2,0,llm,The caller is asking to look up employee records.
+6,search_kb,False,2123.1,0,llm,Caller is describing an IT problem.
+7,lookup_employee,False,5900.0,0,llm,"The caller has not been identified yet, so we need to verify their identity before helping with their IT issue."
+8,search_kb,False,1759.2,0,llm,The caller is asking for a routine IT process.
+9,search_kb,False,1623.4,0,llm,The caller is describing an IT problem with their email.
+10,search_kb,False,2881.4,0,llm,The caller is describing an IT problem.
+12,create_ticket,True,2403.9,0,llm,caller explicitly asks to log a ticket
+13,create_ticket,True,1947.2,0,llm,The caller is explicitly asking to raise a ticket for their cracked monitor.
+14,create_ticket,True,2097.9,0,llm,The caller is explicitly asking to open a support request for their issue.
+16,create_ticket,True,2461.6,0,llm,The caller explicitly asked to log a ticket.
+17,escalate,True,1804.8,0,llm,caller is asking for a human
+18,escalate,True,2346.3,0,llm,The caller is asking to speak with a human support agent.
+19,escalate,True,2667.8,0,llm,The caller is explicitly asking for a manager due to dissatisfaction with the service.
+21,unsupported,False,1995.9,0,llm,"The caller is asking for support with a personal account, which is outside the scope of workplace IT support."
+23,unsupported,False,2581.2,0,llm,The caller is requesting a task that is not an IT support task.
+24,unsupported,False,1649.3,0,llm,This request is out of scope for workplace IT support as it relates to HR matters.
+25,chitchat,False,1343.8,0,llm,The caller uttered a greeting.
+26,chitchat,False,1470.3,0,llm,The caller is expressing gratitude.
+27,chitchat,False,2980.1,0,llm,"The caller is giving a compliment, which is small talk."

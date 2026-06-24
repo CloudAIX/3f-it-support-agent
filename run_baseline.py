@@ -5,9 +5,10 @@ Usage:
     python run_baseline.py golden_dataset_v1.csv predictions_train_baseline.csv --split train
 
 Writes a predictions CSV with columns:
-    id, predicted_tool, predicted_requires_approval, latency_ms, total_tokens, raw
+    id, predicted_tool, predicted_requires_approval, latency_ms, total_tokens, route_path, raw
 
-total_tokens is set to 0 — /route does not expose usage yet.
+total_tokens = prompt_tokens + completion_tokens from the /route response usage field.
+Fast-path (pre-classifier) rows have 0 tokens — no LLM call is made.
 Latency is wall-clock time for the HTTP round-trip (includes network).
 For gated tools (create_ticket, escalate) the budget spec says agent_time_only,
 so wall-clock here is conservative (will over-report latency for those rows).
@@ -60,6 +61,7 @@ def run(golden_path, output_path, split):
                 "predicted_requires_approval": False,
                 "latency_ms": 0,
                 "total_tokens": 0,
+                "route_path": "error",
                 "raw": str(e),
             })
             continue
@@ -69,6 +71,8 @@ def run(golden_path, output_path, split):
         predicted_requires_approval = args.get("requires_approval", False)
         reasoning = data.get("reasoning", "")
         route_path = data.get("route_path", "llm")
+        usage = data.get("usage") or {}
+        total_tokens = usage.get("prompt_tokens", 0) + usage.get("completion_tokens", 0)
         target = row.get("target_tool", "?")
         match = "✓" if predicted_tool == target else f"✗ (want {target})"
         path_tag = "[fast]" if route_path == "fast" else "[llm] "
@@ -81,7 +85,7 @@ def run(golden_path, output_path, split):
             "predicted_tool": predicted_tool,
             "predicted_requires_approval": predicted_requires_approval,
             "latency_ms": round(latency_ms, 1),
-            "total_tokens": 0,
+            "total_tokens": total_tokens,
             "route_path": route_path,
             "raw": reasoning,
         })
