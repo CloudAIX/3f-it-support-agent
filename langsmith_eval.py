@@ -34,7 +34,10 @@ import os
 import sys
 
 import requests
+from dotenv import load_dotenv
 from langsmith import Client, evaluate
+
+load_dotenv()
 
 ROUTE_URL = os.getenv("ROUTE_URL", "http://127.0.0.1:8000/route")
 DATASET_NAME = "3f-routing-golden-v1"
@@ -191,7 +194,7 @@ def main() -> None:
                 "Running against all rows."
             )
         else:
-            target_data = [ex.id for ex in examples]
+            target_data = examples
             print(f"Filtered to {len(target_data)} examples (split={args.split}).")
 
     print(f"\nRunning eval | experiment-prefix={args.experiment_prefix!r} | URL={ROUTE_URL}")

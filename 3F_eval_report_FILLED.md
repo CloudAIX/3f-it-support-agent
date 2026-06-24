@@ -182,6 +182,8 @@ code change needed, as LangGraph emits traces automatically.
 Command: `python run_baseline.py golden_dataset_v1.csv predictions_train_baseline.csv --split train`
 Scored: `python score.py golden_dataset_v1.csv cost_latency_budgets.csv predictions_train_baseline.csv --split train`
 
+LangSmith experiment: [baseline-7362e382](https://smith.langchain.com/o/96a917a7-5221-4004-869c-38839883e442/datasets/bc531937-e735-4967-b110-df500e7bee9d/compare?selectedSessions=372fc8f2-b340-4f61-873a-279913aa4eca)
+
 | Metric | Baseline result |
 | --- | --- |
 | Routing accuracy | 95.7% (22 / 23) |
@@ -302,6 +304,8 @@ Run once against 5 held-out rows after both fixes. Never tuned against.
 
 Command: `python run_baseline.py golden_dataset_v1.csv predictions_validation.csv --split validation`
 Scored: `python score.py golden_dataset_v1.csv cost_latency_budgets.csv predictions_validation.csv --split validation`
+
+LangSmith experiment: [validation-79ae4f25](https://smith.langchain.com/o/96a917a7-5221-4004-869c-38839883e442/datasets/bc531937-e735-4967-b110-df500e7bee9d/compare?selectedSessions=44bfb46e-0815-444d-b5ea-334fad164596)
 
 | Metric | Train (final) | Validation | Gap |
 | --- | --- | --- | --- |
