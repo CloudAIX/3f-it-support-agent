@@ -1,6 +1,7 @@
 langgraph
 langchain
 langchain-openai
+langsmith
 python-dotenv
 fastapi
 uvicorn[standard]

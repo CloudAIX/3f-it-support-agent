@@ -22,6 +22,7 @@ from datetime import datetime, timezone
 
 from dotenv import load_dotenv
 from fastapi import FastAPI
+from langsmith import traceable
 from openai import OpenAI
 from pydantic import BaseModel, Field
 
@@ -625,6 +626,35 @@ def _pre_classify(utterance: str) -> RouteDecision | None:
     return None
 
 
+@traceable(name="route_llm_call")
+def _route_llm_call(utterance: str, context: str) -> dict:
+    """Call Nebius for a routing decision. Traced to LangSmith when LANGCHAIN_TRACING_V2=true."""
+    client = _get_nebius()
+    resp = client.chat.completions.create(
+        model=NEBIUS_MODEL,
+        max_tokens=300,
+        tools=_ROUTE_TOOLS,
+        tool_choice="required",
+        messages=[
+            {"role": "system", "content": _ROUTE_SYSTEM},
+            {"role": "user", "content": f'Caller utterance{context}: "{utterance}"'},
+        ],
+    )
+    tool_calls = resp.choices[0].message.tool_calls
+    if not tool_calls:
+        raise ValueError("No tool call returned by the model")
+    call = tool_calls[0]
+    return {
+        "chosen_tool": call.function.name,
+        "arguments": call.function.arguments,
+        "raw": str(tool_calls),
+        "usage": {
+            "prompt_tokens": resp.usage.prompt_tokens if resp.usage else 0,
+            "completion_tokens": resp.usage.completion_tokens if resp.usage else 0,
+        },
+    }
+
+
 # Schemas for all six routing targets presented as function-call tools so the
 # model can't return anything outside the allowed vocabulary.
 _ROUTE_TOOLS = [
@@ -876,42 +906,9 @@ def route(request: RouteRequest) -> RouteDecision:
         context = f" (caller already verified as {request.verified_employee_id})"
 
     try:
-        client = _get_nebius()
-        resp = client.chat.completions.create(
-            model=NEBIUS_MODEL,
-            max_tokens=300,
-            tools=_ROUTE_TOOLS,
-            tool_choice="required",
-            messages=[
-                {"role": "system", "content": _ROUTE_SYSTEM},
-                {
-                    "role": "user",
-                    "content": f'Caller utterance{context}: "{request.utterance}"',
-                },
-            ],
-        )
-        raw = str(resp.choices[0].message.tool_calls) if resp.choices[0].message.tool_calls else ""
-    except Exception as err:
-        logger.info("route API FAILED — %s", err)
-        decision = RouteDecision(
-            chosen_tool="escalate",
-            args={"employee_id": "unknown", "issue": request.utterance, "reason": "routing error", "requires_approval": True},
-            reasoning=f"Routing call failed; failing safe to escalate. Error: {err}",
-            raw_model_output=str(err),
-            route_path="llm",
-        )
-        logger.info("route — utterance=%r chosen=%s approval=%s path=llm", request.utterance, decision.chosen_tool, True)
-        return decision
-
-    # Parse the function-call response
-    try:
-        tool_calls = resp.choices[0].message.tool_calls
-        if not tool_calls:
-            raise ValueError("No tool call returned by the model")
-
-        call = tool_calls[0]
-        chosen = call.function.name
-        args = json.loads(call.function.arguments)
+        result = _route_llm_call(request.utterance, context)
+        chosen = result["chosen_tool"]
+        args = json.loads(result["arguments"])
         reasoning = args.pop("reasoning", "No reasoning provided.")
 
         # Enforce the gating rule regardless of what the model returns
@@ -924,16 +921,16 @@ def route(request: RouteRequest) -> RouteDecision:
             chosen_tool=chosen,
             args=args,
             reasoning=reasoning,
-            raw_model_output=raw,
+            raw_model_output=result["raw"],
             route_path="llm",
         )
     except Exception as err:
-        logger.info("route PARSE FAILED — %s | raw: %s", err, raw)
+        logger.info("route FAILED — %s", err)
         decision = RouteDecision(
             chosen_tool="escalate",
-            args={"employee_id": "unknown", "issue": request.utterance, "reason": "parse error", "requires_approval": True},
-            reasoning=f"Could not parse routing decision; failing safe to escalate. Error: {err}",
-            raw_model_output=raw,
+            args={"employee_id": "unknown", "issue": request.utterance, "reason": "routing error", "requires_approval": True},
+            reasoning=f"Routing call failed; failing safe to escalate. Error: {err}",
+            raw_model_output=str(err),
             route_path="llm",
         )
 
