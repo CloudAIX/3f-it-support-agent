@@ -696,6 +696,7 @@ _ROUTE_TOOLS = [
                 "Search the IT support knowledge base for a fix to the caller's issue. "
                 "Use after the caller is verified to find resolution steps for routine IT problems "
                 "(password reset, VPN, software, printer, email). "
+                "Not for hardware or equipment faults, or demands that IT fix something — those need a ticket. "
                 "READ tool — safe to call without confirmation. requires_approval=false."
             ),
             "parameters": {
@@ -861,7 +862,7 @@ _ROUTE_SYSTEM = (
     "that best describes what the agent should do first. "
     "Rules:\n"
     "- lookup_employee: caller is identifying themselves or wants their record looked up.\n"
-    "- search_kb: caller describes an IT problem (password, VPN, email, printer, software).\n"
+    "- search_kb: caller asks how to do or fix a routine IT task (password, VPN, email, printer, software) that instructions can solve.\n"
     "- create_ticket: caller explicitly asks to raise, log, or open a ticket. "
     "  Set requires_approval=true.\n"
     "- escalate: caller asks for a human, is dissatisfied, or has a complex/repeat issue. "
@@ -876,6 +877,11 @@ _ROUTE_SYSTEM = (
     "Only route to lookup_employee when the caller is explicitly asking to verify or pull up "
     "an account or record, or gives an employee ID to be checked. "
     "'Can't log in' is a support issue (search_kb), not an identity lookup.\n"
+    "DISAMBIGUATION — search_kb vs create_ticket: if the caller reports a fault in their "
+    "hardware or equipment, or demands that IT fix the problem for them ('sort it out', "
+    "'fix this') rather than asking how to fix it themselves, route to create_ticket — "
+    "a knowledge base article cannot repair equipment. Routine problems solvable with "
+    "instructions ('Can't log in', 'How do I reset my password') stay with search_kb.\n"
     "IMPORTANT: create_ticket and escalate are WRITE tools — always set requires_approval=true "
     "for those two, and false for all others. "
     "You MUST call exactly one function. Do not return plain text."
