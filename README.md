@@ -175,6 +175,9 @@ Full evaluation write-up: [`EVALUATION_REPORT.md`](./EVALUATION_REPORT.md)
 
 ## Evaluation Results
 
+![Routing accuracy: 95.7% baseline, 100% after two fixes, 80% on the held-out validation split](./results-heldout.png)
+
+
 Last verified run: 17 July 2026
 LangSmith experiment: `id15-recheck-2026-07-17-18a1b50f` (project: `3f-routing-eval`, dataset: `3f-routing-golden-v1`, 28 cases)
 
