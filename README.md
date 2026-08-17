@@ -77,6 +77,59 @@ ElevenLabs calls. The backend is the part in this repository.
 This build uses **one agent** (the ElevenLabs loop) that **routes** to the right tool for
 each step. It is not a multi-agent network. This was a deliberate choice, explained below.
 
+### Routing and the approval gate
+
+Every caller utterance takes one of two paths. The deterministic pre-classifier handles
+only unambiguous cases and is forbidden from emitting a write tool; anything requiring
+judgement falls through to the model, which must set `requires_approval=true` on writes.
+
+```mermaid
+flowchart TD
+    A["Caller utterance<br/>(ElevenLabs STT)"] --> B{"_pre_classify()<br/>word-boundary keyword rules"}
+    B -->|"injection detected"| C["chitchat<br/>injection_refusal"]
+    B -->|"out of scope"| D["unsupported"]
+    B -->|"social, no IT content"| E["chitchat"]
+    B -->|"ambiguous → None"| F["Llama 3.3 70B on Nebius<br/>tool_choice = required"]
+
+    F --> G{"tool class?"}
+    G -->|"READ"| H["lookup_employee / search_kb<br/>runs autonomously"]
+    G -->|"WRITE"| I["create_ticket / escalate"]
+    I --> J{"requires_approval<br/>== true?"}
+    J -->|"yes"| K["Pause — human confirms<br/>before the tool fires"]
+    J -->|"no"| L["SAFETY HARD FAIL<br/>eval gate blocks the ship"]
+
+    C --> M["Response to caller"]
+    D --> M
+    E --> M
+    H --> M
+    K --> M
+
+    style L fill:#ffdddd,stroke:#cc0000
+    style K fill:#ddffdd,stroke:#00aa00
+```
+
+The fast path exists for latency, not accuracy: a greeting resolves in ~130ms instead of a
+~3,245ms model round-trip. It is capped at about 6 of 23 rows — `lookup_employee`,
+`search_kb`, `create_ticket` and `escalate` all need reasoning and cannot be keyword-classified.
+
+### The evaluation loop
+
+```mermaid
+flowchart LR
+    A["golden_dataset_v1.csv<br/>28 hand-labelled rows"] --> B["run_baseline.py<br/>POSTs each utterance to /route"]
+    B --> C["predictions_*.csv<br/>tool, approval flag, latency, path"]
+    C --> D["score.py<br/>three axes"]
+    D --> E["Quality<br/>precision / recall / macro F1"]
+    D --> F["Safety<br/>approval-gate compliance"]
+    D --> G["Cost + speed<br/>latency vs tool-class budget"]
+    F -->|"any miss"| H["SHIP CHECK: NOT SHIPPABLE"]
+    A --> I["Judge/judge_runner.py<br/>LLM-as-judge, 2 failure modes"]
+    I --> J["judge_score.py<br/>scored as binary classifier<br/>vs 18 human labels"]
+```
+
+Split is fixed at 23 train / 5 validation (seed 42). The validation rows are never tuned
+against — that is what makes the 80% held-out number meaningful.
+
 ---
 
 ## Week 4 — Evaluation
@@ -118,7 +171,7 @@ Unfixed baseline (train, 23 rows): **22/23 routing accuracy (95.7%), 0 safety ha
 Post-improvement (train, after both fixes): **23/23 routing accuracy (100%), 0 safety hard fails.**
 Validation / held-out (5 rows, run once after fixes): **4/5 routing accuracy (80%), 1 safety hard fail (id=15 — vague complaint, unfixed by design).**
 
-Full evaluation write-up: [`3F_eval_report_FILLED.md`](./3F_eval_report_FILLED.md)
+Full evaluation write-up: [`EVALUATION_REPORT.md`](./EVALUATION_REPORT.md)
 
 ## Evaluation Results
 
@@ -283,11 +336,29 @@ crashing the app.
 
 ---
 
+## Tests
+
+The evaluation measures the agent's behaviour end to end. These unit tests guard the two
+pieces of pure logic where a mistake is unsafe rather than merely wrong:
+
+```bash
+pip install pytest
+pytest -q      # 16 tests, no API key required
+```
+
+| What is covered | Why it exists |
+|---|---|
+| Word-boundary matching | The first pre-classifier used Python's `in`, so `"hi"` matched inside `"this"` and a frustrated caller ("This is the third time I've called") was routed to small talk. The regression is pinned in `test_substring_match_would_have_caused_the_id17_failure`. |
+| Fast path never emits a write tool | A write-class intent escaping onto a non-gated path is the primary unsafe case for this agent. |
+| Injection refusal ordering | The injection check must run before IT-keyword rules so vocabulary cannot smuggle an injection through. |
+| Fall-through discipline | The two cases the evaluation caught (id=7, id=15) must reach the model rather than be keyword-guessed. |
+
 ## What is in this repository
 
 | File | What it is |
 |---|---|
 | `main.py` | FastAPI backend — five tool endpoints plus the `/route` eval endpoint. `_route_llm_call()` is decorated with `@traceable` for LangSmith. |
+| `test_routing.py` | Unit tests for the pre-classifier's word-boundary and gating rules (16 tests, no API key needed). |
 | `requirements.txt` | Python packages (FastAPI, uvicorn, openai, langsmith, python-dotenv, pydantic, requests). |
 | `golden_dataset_v1.csv` | 28 hand-labelled routing cases (23 train / 5 validation, seed 42). |
 | `run_baseline.py` | Batch eval runner — posts each row to `/route`, saves predictions CSV. |
@@ -298,7 +369,7 @@ crashing the app.
 | `predictions_train_fix2.csv` | Predictions after keyword pre-classifier fix. |
 | `predictions_validation.csv` | Predictions from the held-out validation split. |
 | `cost_latency_budgets.csv` | Per-tool latency budgets used by `score.py`. |
-| `3F_eval_report_FILLED.md` | Full Week 4 evaluation report. |
+| `EVALUATION_REPORT.md` | Full Week 4 evaluation report. |
 | `multiagent/` | Week 3 multi-agent LangGraph system (separate README inside). |
 | `.gitignore` | Keeps `.venv` and `.env` out of the repo. |
 | `README.md` | This file. |
