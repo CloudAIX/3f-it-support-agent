@@ -1,5 +1,10 @@
 # 3F IT-Support Router — Week 4 Evaluation Report
 
+> This report preserves the original Week 4 evaluation and held-out failure.
+> A [later prompt change](https://github.com/CloudAIX/3f-it-support-agent/commit/11e45636f57268d756d5721d2b16a22d735458bd)
+> records a 28/28 recheck (`id15-fix-v3-2026-07-17-2763bb70`). Because case 15
+> informed that change, the recheck is regression evidence, not a fresh holdout.
+
 *Course: Mastering Agentic AI — Evals, Observability & Monitoring.*
 *Use case 3: evaluate your own project using code-based scoring and LLM-as-judge.*
 

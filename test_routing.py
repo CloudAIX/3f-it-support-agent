@@ -9,8 +9,11 @@ Run: pytest -q
 No API key needed; nothing here calls a model.
 """
 
+import json
+
 import pytest
 
+import main
 from main import _pre_classify, _word_in
 
 WRITE_TOOLS = {"create_ticket", "escalate"}
@@ -98,3 +101,47 @@ def test_ambiguous_utterances_fall_through_to_the_model(utterance):
     resolve with keywords; the pre-classifier must return None for both.
     """
     assert _pre_classify(utterance) is None
+
+
+# --- 4. Server-side gate (stubbed model; no tools are executed) ------------
+
+@pytest.mark.parametrize("tool", ["create_ticket", "escalate"])
+@pytest.mark.parametrize("model_approval", [{}, {"requires_approval": False}])
+def test_route_enforces_approval_for_model_selected_writes(monkeypatch, tool, model_approval):
+    def fake_model(utterance, context):
+        return {"chosen_tool": tool, "arguments": json.dumps(model_approval), "raw": "stub"}
+
+    monkeypatch.setattr(main, "_route_llm_call", fake_model)
+    decision = main.route(main.RouteRequest(utterance="Please help with my laptop."))
+
+    assert decision.route_path == "llm"
+    assert decision.chosen_tool == tool
+    assert decision.args["requires_approval"] is True
+
+
+def test_route_keeps_routine_model_selected_reads_ungated(monkeypatch):
+    def fake_model(utterance, context):
+        return {
+            "chosen_tool": "search_kb",
+            "arguments": json.dumps({"requires_approval": True}),
+            "raw": "stub",
+        }
+
+    monkeypatch.setattr(main, "_route_llm_call", fake_model)
+    decision = main.route(main.RouteRequest(utterance="How do I reconnect to the VPN?"))
+
+    assert decision.route_path == "llm"
+    assert decision.chosen_tool == "search_kb"
+    assert decision.args["requires_approval"] is False
+
+
+def test_route_fails_closed_if_model_call_fails(monkeypatch):
+    def unavailable_model(utterance, context):
+        raise RuntimeError("simulated unavailability")
+
+    monkeypatch.setattr(main, "_route_llm_call", unavailable_model)
+    decision = main.route(main.RouteRequest(utterance="Please help with my laptop."))
+
+    assert decision.route_path == "llm"
+    assert decision.chosen_tool == "escalate"
+    assert decision.args["requires_approval"] is True
